@@ -2,40 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Student & Admin Portal</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        background: #f5f8ff;
-        text-align: center;
-        padding: 20px;
-      }
-      input,
-      button {
-        margin: 5px;
-        padding: 10px;
-        font-size: 16px;
-      }
-      .btn-group a,
-      .btn-group button {
-        display: inline-block;
-        padding: 10px 20px;
-        margin: 10px;
-        text-decoration: none;
-        background-color: #007bff;
-        color: white;
-        font-weight: bold;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-      }
-      .btn-group a:hover,
-      button:hover {
-        background-color: #0056b3;
-      }
-    </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+    
   </head>
   <body>
     <h1>📚 Student & Admin Portal</h1>
