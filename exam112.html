@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Student & Admin Portal</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f5f8ff;
+        text-align: center;
+        padding: 20px;
+      }
+      input,
+      button {
+        margin: 5px;
+        padding: 10px;
+        font-size: 16px;
+      }
+      .btn-group a,
+      .btn-group button {
+        display: inline-block;
+        padding: 10px 20px;
+        margin: 10px;
+        text-decoration: none;
+        background-color: #007bff;
+        color: white;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .btn-group a:hover,
+      button:hover {
+        background-color: #0056b3;
+      }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+  </head>
+  <body>
+    <h1>📚 Student & Admin Portal</h1>
+    <div class="btn-group">
+      <button onclick="studentLogin()">Student Login</button>
+      <button onclick="adminLogin()">Admin Login</button>
+    </div>
+
+    <div id="app"></div>
+
+    <script>
+      const app = document.getElementById("app");
+
+      function studentLogin() {
+        app.innerHTML = `
+        <h2>Student Login</h2>
+        <input id="name" placeholder="Name"><br>
+        <input id="roll" placeholder="Roll No"><br>
+        <input id="branch" placeholder="Branch"><br>
+        <input id="phone" placeholder="Phone No"><br>
+        <button onclick="saveStudent()">Login</button>
+      `;
+      }
+
+      function saveStudent() {
+        const student = {
+          name: name.value,
+          roll: roll.value,
+          branch: branch.value,
+          phone: phone.value,
+        };
+        localStorage.setItem("currentStudent", JSON.stringify(student));
+        studentDashboard();
+      }
+
+      function studentDashboard() {
+        const s = JSON.parse(localStorage.getItem("currentStudent"));
+        if (!s) return studentLogin();
+
+        const results = JSON.parse(localStorage.getItem("allResults") || "[]");
+        const myResults = results.filter((r) => r.roll === s.roll);
+        const top = [...results].sort((a, b) => b.score - a.score)[0];
+
+        app.innerHTML = `
+        <h2>Welcome ${s.name} (${s.roll})</h2>
+        <button onclick="startExam()">Start Exam</button>
+        <h3>Your Results</h3>
+        ${
+          myResults
+            .map((r, i) => `<p>Attempt ${i + 1}: ${r.score}/50</p>`)
+            .join("") || "No exam yet."
+        }
+        <h3>Topper</h3>
+        ${top ? `${top.name} (${top.roll}) - ${top.score}/50` : "No data"}
+        <br><br>
+        <button onclick="downloadExcel()">Download All Results</button>
+      `;
+      }
+
+      function downloadExcel() {
+        const data = JSON.parse(localStorage.getItem("allResults") || "[]");
+        let csv = "Name,Roll,Branch,Phone,Score\n";
+        data.forEach((d) => {
+          csv += `${d.name},${d.roll},${d.branch},${d.phone},${d.score}\n`;
+        });
+        const blob = new Blob([csv], { type: "text/csv" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "results.csv";
+        a.click();
+      }
+
+      function adminLogin() {
+        app.innerHTML = `
+        <h2>Admin Login</h2>
+        <input type="password" id="adminPass" placeholder="Password"><br>
+        <button onclick="checkAdmin()">Login</button>
+      `;
+      }
+
+      function checkAdmin() {
+        if (document.getElementById("adminPass").value === "admin123") {
+          localStorage.setItem("adminLoggedIn", true);
+          adminPanel();
+        } else {
+          alert("Wrong password");
+        }
+      }
+
+      function adminPanel() {
+        if (!localStorage.getItem("adminLoggedIn")) return adminLogin();
+
+        app.innerHTML = `
+        <h2>Admin Panel</h2>
+        <input type="file" id="docxFile" accept=".docx">
+        <button onclick="uploadQuestions()">Upload Questions (.docx)</button>
+        <hr>
+        <button onclick="downloadExcel()">Download Results</button>
+        <button onclick="clearResults()">Clear All Results</button>
+        <button onclick="clearQuestions()">Clear All Questions</button>
+      `;
+      }
+
+      function clearResults() {
+        if (confirm("Clear all student results?")) {
+          localStorage.removeItem("allResults");
+          alert("All results cleared.");
+        }
+      }
+
+      function clearQuestions() {
+        if (
+          confirm("Are you sure you want to delete all uploaded questions?")
+        ) {
+          localStorage.removeItem("questions");
+          alert("All questions have been removed.");
+        }
+      }
+
+      function uploadQuestions() {
+        const file = document.getElementById("docxFile").files[0];
+        if (!file) return alert("Select a file");
+
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          mammoth
+            .extractRawText({ arrayBuffer: event.target.result })
+            .then((result) => {
+              const qList = result.value
+                .split(/\n?\d+\.\s+/)
+                .slice(1)
+                .map((q) => {
+                  const lines = q.trim().split("\n").filter(Boolean);
+                  const options = lines.slice(1, 5);
+                  const ans = lines.find((l) =>
+                    l.toLowerCase().startsWith("answer:")
+                  );
+                  return {
+                    question: lines[0],
+                    options: options,
+                    answer: ans ? ans.split(":")[1].trim().toUpperCase() : "",
+                  };
+                });
+              localStorage.setItem("questions", JSON.stringify(qList));
+              alert(`${qList.length} questions uploaded`);
+            });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+
+      function startExam() {
+        const s = JSON.parse(localStorage.getItem("currentStudent"));
+        const qList = JSON.parse(localStorage.getItem("questions") || "[]");
+        if (qList.length < 50)
+          return alert("Admin hasn't uploaded enough questions.");
+
+        const exam = qList.sort(() => 0.5 - Math.random()).slice(0, 50);
+        let idx = 0,
+          score = 0,
+          answers = [];
+
+        nextQuestion();
+
+        function nextQuestion() {
+          if (idx >= exam.length) return finishExam();
+          const q = exam[idx];
+          let html = `<h3>Q${idx + 1}. ${q.question}</h3>`;
+          q.options.forEach((opt) => {
+            html += `<p><label><input type="radio" name="opt" value="${opt[0]}"> ${opt}</label></p>`;
+          });
+          app.innerHTML =
+            html +
+            `<p><span id="timer">30</span> seconds left</p><button onclick="saveAns()">Next</button>`;
+          let t = 30;
+          const interval = setInterval(() => {
+            t--;
+            document.getElementById("timer").innerText = t;
+            if (t === 0) {
+              clearInterval(interval);
+              saveAns();
+            }
+          }, 1000);
+
+          window.saveAns = () => {
+            clearInterval(interval);
+            const sel = document.querySelector('input[name="opt"]:checked');
+            const selected = sel ? sel.value : "";
+            answers.push({ question: q.question, selected, correct: q.answer });
+            if (selected === q.answer) score++;
+            idx++;
+            nextQuestion();
+          };
+        }
+
+        function finishExam() {
+          const results = JSON.parse(
+            localStorage.getItem("allResults") || "[]"
+          );
+          results.push({ ...s, score });
+          localStorage.setItem("allResults", JSON.stringify(results));
+
+          const { jsPDF } = window.jspdf;
+          const doc = new jsPDF();
+          doc.text(`Name: ${s.name}`, 20, 20);
+          doc.text(`Roll: ${s.roll}`, 20, 30);
+          doc.text(`Score: ${score}/50`, 20, 40);
+          doc.save(`${s.roll}_result.pdf`);
+
+          app.innerHTML = `<h2>Exam Finished</h2><p>Your score: ${score}/50</p><p>PDF downloaded.</p>`;
+        }
+      }
+    </script>
+  </body>
+</html>
